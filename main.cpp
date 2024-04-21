@@ -17,14 +17,16 @@ enum class Opcode {
 };
 
 
+union Operand {
+	int count;
+	int jump_offset;
+};
+
+
 struct Instruction {
 	int position;
 	Opcode opcode;
-
-	union operand {
-		int count;
-		int jump_offset;
-	};
+	Operand operand;
 };
 
 
@@ -85,6 +87,12 @@ void run(size_t memory_size, std::istream &in, std::ostream &out, const std::vec
 				break;
 			case Opcode::OpenBrace:
 				if (memory[head] == 0) {
+					pc = I.operand.jump_offset;
+				}
+
+#if 0
+				if (memory[head] == 0) {
+
 					int depth = 1;
 
 					do {
@@ -100,15 +108,21 @@ void run(size_t memory_size, std::istream &in, std::ostream &out, const std::vec
 				else {
 					call_stack.push(pc);
 				}
+#endif
 
 				break;
 			case Opcode::ClosedBrace:
+				if (memory[head] != 0) {
+					pc = I.operand.jump_offset;
+				}
+#if 0
 				if (memory[head] == 0) {
 					call_stack.pop();
 				}
 				else {
 					pc = call_stack.top();
 				}
+#endif
 
 				break;
 		}
@@ -141,23 +155,24 @@ std::ostream& operator<<(std::ostream &os, Instruction I) {
 }
 
 
-bool check_parenthesis(const std::vector<Instruction> &program) {
-	int depth = 0;
+void build_jump_table(std::vector<Instruction> &program) {
+	std::stack<int> call_stack;
 
-	for (const Instruction I : program) {
-		if (I.opcode == Opcode::OpenBrace) {
-			++depth;
+	for (int i = 0; i < program.size(); ++i) {
+		if (program[i].opcode == Opcode::OpenBrace) {
+			call_stack.push(i);
 		}
-		else if (I.opcode == Opcode::OpenBrace) {
-			if (depth == 0) {
-				return false;
+		else if (program[i].opcode == Opcode::ClosedBrace) {
+			if (call_stack.empty()) {
+				std::cerr << "Unexpected closed parenthesis at " << program[i].position << std::endl;
+				break;
 			}
 
-			--depth;
+			program[i].operand.jump_offset = call_stack.top();
+			program[call_stack.top()].operand.jump_offset = i;
+			call_stack.pop();
 		}
 	}
-
-	return true;
 }
 
 
@@ -170,12 +185,8 @@ int main(int argc, char *argv[]) {
 
 
 	std::ifstream in(argv[1]);
-	const std::vector<Instruction> program = load_program_source(in);
-
-
-	if (!check_parenthesis(program)) {
-		std::cerr << "Problem with the parenthesis, quitting" << std::endl;
-	}
+	std::vector<Instruction> program = load_program_source(in);
+	build_jump_table(program);
 
 
 	run(1000, std::cin, std::cout, program);
