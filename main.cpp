@@ -1,11 +1,11 @@
 #include <iostream>
+#include <istream>
 #include <fstream>
 #include <vector>
-#include <string>
 #include <stack>
 
 
-enum class Opcode{
+enum class Opcode {
 	Increment,
 	Decrement,
 	Left,
@@ -17,7 +17,105 @@ enum class Opcode{
 };
 
 
-using Instruction = std::pair<int, Opcode>;
+struct Instruction {
+	int position;
+	Opcode opcode;
+
+	union operand {
+		int count;
+		int jump_offset;
+	};
+};
+
+
+std::vector<Instruction> load_program_source(std::istream &in) {
+	std::vector<Instruction> program;
+	int i = 0;
+
+	while (!in.eof()) {
+		const char symbol = in.get();
+		Opcode opcode;
+
+		switch (symbol) {
+			case '+': program.push_back({i, Opcode::Increment})  ; break;
+			case '-': program.push_back({i, Opcode::Decrement})  ; break;
+			case '<': program.push_back({i, Opcode::Left})       ; break;
+			case '>': program.push_back({i, Opcode::Right})      ; break;
+			case ',': program.push_back({i, Opcode::Get})        ; break;
+			case '.': program.push_back({i, Opcode::Put})        ; break;
+			case '[': program.push_back({i, Opcode::OpenBrace})  ; break;
+			case ']': program.push_back({i, Opcode::ClosedBrace}); break;
+		}
+
+		++i;
+	}
+
+	return program;
+}
+
+
+void run(size_t memory_size, std::istream &in, std::ostream &out, const std::vector<Instruction> &program) {
+	std::vector<char> memory(memory_size);
+	std::stack<int> call_stack;
+
+	int pc   = 0;
+	int head = 0;
+
+	while (pc < program.size()) {
+		const Instruction I = program[pc];
+
+		switch (I.opcode) {
+			case Opcode::Increment:
+				memory[head] += 1;
+				break;
+			case Opcode::Decrement:
+				memory[head] -= 1;
+				break;
+			case Opcode::Left:
+				--head;
+				break;
+			case Opcode::Right:
+				++head;
+				break;
+			case Opcode::Get:
+				memory[head] = in.get();
+				break;
+			case Opcode::Put:
+				out << memory[head];
+				break;
+			case Opcode::OpenBrace:
+				if (memory[head] == 0) {
+					int depth = 1;
+
+					do {
+						++pc;
+						if (program[pc].opcode == Opcode::OpenBrace) {
+							++depth;
+						}
+						else if (program[pc].opcode == Opcode::ClosedBrace) {
+							--depth;
+						}
+					} while (depth > 0 && pc < program.size());
+				}
+				else {
+					call_stack.push(pc);
+				}
+
+				break;
+			case Opcode::ClosedBrace:
+				if (memory[head] == 0) {
+					call_stack.pop();
+				}
+				else {
+					pc = call_stack.top();
+				}
+
+				break;
+		}
+
+		++pc;
+	}
+}
 
 
 std::ostream& operator<<(std::ostream &os, Opcode op) {
@@ -37,37 +135,9 @@ std::ostream& operator<<(std::ostream &os, Opcode op) {
 
 
 std::ostream& operator<<(std::ostream &os, Instruction I) {
-	os << "(" << I.first << " , " << I.second << ")" << std::endl;
+	os << "(" << I.position << " , " << I.opcode << ")" << std::endl;
 
 	return os;
-}
-
-
-std::vector<Instruction> load_source(const std::string &filename) {
-	std::vector<Instruction> program;
-	std::ifstream source(filename);
-
-
-	int i = 0;
-	while (!source.eof() && source.good()) {
-		const char symbol = source.get();
-
-		switch (symbol) {
-			case '+': program.push_back({i, Opcode::Increment});   break;
-			case '-': program.push_back({i, Opcode::Decrement});   break;
-			case '<': program.push_back({i, Opcode::Left});        break;
-			case '>': program.push_back({i, Opcode::Right});       break;
-			case ',': program.push_back({i, Opcode::Get});         break;
-			case '.': program.push_back({i, Opcode::Put});         break;
-			case '[': program.push_back({i, Opcode::OpenBrace});   break;
-			case ']': program.push_back({i, Opcode::ClosedBrace}); break;
-		}
-
-		++i;
-	}
-
-
-	return program;
 }
 
 
@@ -75,10 +145,10 @@ bool check_parenthesis(const std::vector<Instruction> &program) {
 	int depth = 0;
 
 	for (const Instruction I : program) {
-		if (I.second == Opcode::OpenBrace) {
+		if (I.opcode == Opcode::OpenBrace) {
 			++depth;
 		}
-		else if (I.second == Opcode::OpenBrace) {
+		else if (I.opcode == Opcode::OpenBrace) {
 			if (depth == 0) {
 				return false;
 			}
@@ -93,18 +163,14 @@ bool check_parenthesis(const std::vector<Instruction> &program) {
 
 int main(int argc, char *argv[]) {
 	if (argc < 3) {
-		std::cerr << "Usage: bf program.b \"input stream\"" << std::endl;
+		std::cerr << "Usage        bf program.b \"input stream\"" << std::endl;
+		std::cerr << "Alternative  bf program.b -" << std::endl;
 		return 1;
 	}
 
 
-	const std::vector<Instruction> program = load_source(argv[1]);
-
-
-	// it would be nice to automatically derive the printing of the vector
-	for (const Instruction I : program) {
-		std::cout << "(" << I.first << ", " << I.second << ")" << std::endl;
-	}
+	std::ifstream in(argv[1]);
+	const std::vector<Instruction> program = load_program_source(in);
 
 
 	if (!check_parenthesis(program)) {
@@ -112,67 +178,7 @@ int main(int argc, char *argv[]) {
 	}
 
 
-	// actual interpretation
-	std::vector<char> memory(1000);
-	std::stack<int> call_stack;
-	int ptr = 0;
-	int pc = 0;
-
-
-	while (pc < program.size()) {
-		const Instruction I = program[pc];
-
-		switch (I.second) {
-			case Opcode::Increment:
-				memory[ptr] += 1;
-				break;
-			case Opcode::Decrement:
-				memory[ptr] -= 1;
-				break;
-			case Opcode::Left:
-				--ptr;
-				break;
-			case Opcode::Right:
-				++ptr;
-				break;
-			case Opcode::Get:
-				memory[ptr] = std::cin.get();
-				break;
-			case Opcode::Put:
-				std::cout << memory[ptr];
-				break;
-			case Opcode::OpenBrace:
-				if (memory[ptr] == 0) {
-					int depth = 1;
-
-					do {
-						++pc;
-						if (program[pc].second == Opcode::OpenBrace) {
-							++depth;
-						}
-						else if (program[pc].second == Opcode::ClosedBrace) {
-							--depth;
-						}
-					} while (depth > 0 && pc < program.size());
-				}
-				else {
-					call_stack.push(pc);
-				}
-
-				break;
-			case Opcode::ClosedBrace:
-				if (memory[ptr] == 0) {
-					call_stack.pop();
-				}
-				else {
-					pc = call_stack.top();
-				}
-
-				break;
-		}
-
-		++pc;
-	}
+	run(1000, std::cin, std::cout, program);
 
 
 	return 0;
