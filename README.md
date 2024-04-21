@@ -24,8 +24,8 @@ A bf program is a string of characters in the set {+-><,.[]} and they represent 
 The user initiates the interpreter by providing a bf program and the input stream
 
 ```
-bf program.bf "input string for the runtime"
-bf program.bf -
+bf program.b "input string for the runtime"
+bf program.b -
 ```
 
 The input stream could be a predefined string or just stdin.
@@ -40,3 +40,5 @@ The error messages about parenthesis should signal the position of the first err
 
 ## Notes
 At this point we should have a clear idea about the interaction with the system to be. It was hard not to think about implementation details, but this description should be sufficiently general to be implemented by multiple programmers using multiple technologies.
+
+All the files in the samples directory are not mine, I will use them to test the interpreter/compiler

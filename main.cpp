@@ -5,7 +5,7 @@
 #include <stack>
 
 
-enum class OpCode{
+enum class Opcode{
 	Increment,
 	Decrement,
 	Left,
@@ -17,27 +17,32 @@ enum class OpCode{
 };
 
 
-// it would be nice to automatically derive such code
-std::ostream& operator<<(std::ostream &os, OpCode op) {
+using Instruction = std::pair<int, Opcode>;
+
+
+std::ostream& operator<<(std::ostream &os, Opcode op) {
 	switch (op) {
-		case OpCode::Increment  : os << "Increment"  ; break;
-		case OpCode::Decrement  : os << "Decrement"  ; break;
-		case OpCode::Left       : os << "Left"       ; break;
-		case OpCode::Right      : os << "Right"      ; break;
-		case OpCode::Get        : os << "Get"        ; break;
-		case OpCode::Put        : os << "Put"        ; break;
-		case OpCode::OpenBrace  : os << "OpenBrace"  ; break;
-		case OpCode::ClosedBrace: os << "ClosedBrace"; break;
+		case Opcode::Increment  : os << "Increment"  ; break;
+		case Opcode::Decrement  : os << "Decrement"  ; break;
+		case Opcode::Left       : os << "Left"       ; break;
+		case Opcode::Right      : os << "Right"      ; break;
+		case Opcode::Get        : os << "Get"        ; break;
+		case Opcode::Put        : os << "Put"        ; break;
+		case Opcode::OpenBrace  : os << "OpenBrace"  ; break;
+		case Opcode::ClosedBrace: os << "ClosedBrace"; break;
 	}
 
 	return os;
 }
 
 
-using Instruction = std::pair<int, OpCode>;
+std::ostream& operator<<(std::ostream &os, Instruction I) {
+	os << "(" << I.first << " , " << I.second << ")" << std::endl;
+
+	return os;
+}
 
 
-// @TODO: still can't find in the cpp documentation a way to slurp a file
 std::vector<Instruction> load_source(const std::string &filename) {
 	std::vector<Instruction> program;
 	std::ifstream source(filename);
@@ -47,18 +52,15 @@ std::vector<Instruction> load_source(const std::string &filename) {
 	while (!source.eof() && source.good()) {
 		const char symbol = source.get();
 
-		// bug con lo switch case, non mettevo i break
-		// ma se non metti i break non dovrebbe beccare tutti i casi ???
-		// @TODO: dei warning possono beccare questa cosa??
 		switch (symbol) {
-			case '+': program.push_back({i, OpCode::Increment});   break;
-			case '-': program.push_back({i, OpCode::Decrement});   break;
-			case '<': program.push_back({i, OpCode::Left});        break;
-			case '>': program.push_back({i, OpCode::Right});       break;
-			case ',': program.push_back({i, OpCode::Get});         break;
-			case '.': program.push_back({i, OpCode::Put});         break;
-			case '[': program.push_back({i, OpCode::OpenBrace});   break;
-			case ']': program.push_back({i, OpCode::ClosedBrace}); break;
+			case '+': program.push_back({i, Opcode::Increment});   break;
+			case '-': program.push_back({i, Opcode::Decrement});   break;
+			case '<': program.push_back({i, Opcode::Left});        break;
+			case '>': program.push_back({i, Opcode::Right});       break;
+			case ',': program.push_back({i, Opcode::Get});         break;
+			case '.': program.push_back({i, Opcode::Put});         break;
+			case '[': program.push_back({i, Opcode::OpenBrace});   break;
+			case ']': program.push_back({i, Opcode::ClosedBrace}); break;
 		}
 
 		++i;
@@ -73,10 +75,10 @@ bool check_parenthesis(const std::vector<Instruction> &program) {
 	int depth = 0;
 
 	for (const Instruction I : program) {
-		if (I.second == OpCode::OpenBrace) {
+		if (I.second == Opcode::OpenBrace) {
 			++depth;
 		}
-		else if (I.second == OpCode::OpenBrace) {
+		else if (I.second == Opcode::OpenBrace) {
 			if (depth == 0) {
 				return false;
 			}
@@ -91,7 +93,7 @@ bool check_parenthesis(const std::vector<Instruction> &program) {
 
 int main(int argc, char *argv[]) {
 	if (argc < 3) {
-		std::cerr << "Usage: bf program.bf \"input stream\"" << std::endl;
+		std::cerr << "Usage: bf program.b \"input stream\"" << std::endl;
 		return 1;
 	}
 
@@ -121,34 +123,34 @@ int main(int argc, char *argv[]) {
 		const Instruction I = program[pc];
 
 		switch (I.second) {
-			case OpCode::Increment:
+			case Opcode::Increment:
 				memory[ptr] += 1;
 				break;
-			case OpCode::Decrement:
+			case Opcode::Decrement:
 				memory[ptr] -= 1;
 				break;
-			case OpCode::Left:
+			case Opcode::Left:
 				--ptr;
 				break;
-			case OpCode::Right:
+			case Opcode::Right:
 				++ptr;
 				break;
-			case OpCode::Get:
+			case Opcode::Get:
 				memory[ptr] = std::cin.get();
 				break;
-			case OpCode::Put:
+			case Opcode::Put:
 				std::cout << memory[ptr];
 				break;
-			case OpCode::OpenBrace:
+			case Opcode::OpenBrace:
 				if (memory[ptr] == 0) {
 					int depth = 1;
 
 					do {
 						++pc;
-						if (program[pc].second == OpCode::OpenBrace) {
+						if (program[pc].second == Opcode::OpenBrace) {
 							++depth;
 						}
-						else if (program[pc].second == OpCode::ClosedBrace) {
+						else if (program[pc].second == Opcode::ClosedBrace) {
 							--depth;
 						}
 					} while (depth > 0 && pc < program.size());
@@ -158,7 +160,7 @@ int main(int argc, char *argv[]) {
 				}
 
 				break;
-			case OpCode::ClosedBrace:
+			case Opcode::ClosedBrace:
 				if (memory[ptr] == 0) {
 					call_stack.pop();
 				}
