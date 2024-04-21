@@ -30,6 +30,29 @@ struct Instruction {
 };
 
 
+std::ostream& operator<<(std::ostream &os, Opcode op) {
+	switch (op) {
+		case Opcode::Increment  : os << "Increment"  ; break;
+		case Opcode::Decrement  : os << "Decrement"  ; break;
+		case Opcode::Left       : os << "Left"       ; break;
+		case Opcode::Right      : os << "Right"      ; break;
+		case Opcode::Get        : os << "Get"        ; break;
+		case Opcode::Put        : os << "Put"        ; break;
+		case Opcode::OpenBrace  : os << "OpenBrace"  ; break;
+		case Opcode::ClosedBrace: os << "ClosedBrace"; break;
+	}
+
+	return os;
+}
+
+
+std::ostream& operator<<(std::ostream &os, Instruction I) {
+	os << "(" << I.position << " , " << I.opcode << ")" << std::endl;
+
+	return os;
+}
+
+
 std::vector<Instruction> load_program_source(std::istream &in) {
 	std::vector<Instruction> program;
 	int i = 0;
@@ -56,105 +79,6 @@ std::vector<Instruction> load_program_source(std::istream &in) {
 }
 
 
-void run(size_t memory_size, std::istream &in, std::ostream &out, const std::vector<Instruction> &program) {
-	std::vector<char> memory(memory_size);
-	std::stack<int> call_stack;
-
-	int pc   = 0;
-	int head = 0;
-
-	while (pc < program.size()) {
-		const Instruction I = program[pc];
-
-		switch (I.opcode) {
-			case Opcode::Increment:
-				memory[head] += 1;
-				break;
-			case Opcode::Decrement:
-				memory[head] -= 1;
-				break;
-			case Opcode::Left:
-				--head;
-				break;
-			case Opcode::Right:
-				++head;
-				break;
-			case Opcode::Get:
-				memory[head] = in.get();
-				break;
-			case Opcode::Put:
-				out << memory[head];
-				break;
-			case Opcode::OpenBrace:
-				if (memory[head] == 0) {
-					pc = I.operand.jump_offset;
-				}
-
-#if 0
-				if (memory[head] == 0) {
-
-					int depth = 1;
-
-					do {
-						++pc;
-						if (program[pc].opcode == Opcode::OpenBrace) {
-							++depth;
-						}
-						else if (program[pc].opcode == Opcode::ClosedBrace) {
-							--depth;
-						}
-					} while (depth > 0 && pc < program.size());
-				}
-				else {
-					call_stack.push(pc);
-				}
-#endif
-
-				break;
-			case Opcode::ClosedBrace:
-				if (memory[head] != 0) {
-					pc = I.operand.jump_offset;
-				}
-#if 0
-				if (memory[head] == 0) {
-					call_stack.pop();
-				}
-				else {
-					pc = call_stack.top();
-				}
-#endif
-
-				break;
-		}
-
-		++pc;
-	}
-}
-
-
-std::ostream& operator<<(std::ostream &os, Opcode op) {
-	switch (op) {
-		case Opcode::Increment  : os << "Increment"  ; break;
-		case Opcode::Decrement  : os << "Decrement"  ; break;
-		case Opcode::Left       : os << "Left"       ; break;
-		case Opcode::Right      : os << "Right"      ; break;
-		case Opcode::Get        : os << "Get"        ; break;
-		case Opcode::Put        : os << "Put"        ; break;
-		case Opcode::OpenBrace  : os << "OpenBrace"  ; break;
-		case Opcode::ClosedBrace: os << "ClosedBrace"; break;
-	}
-
-	return os;
-}
-
-
-std::ostream& operator<<(std::ostream &os, Instruction I) {
-	os << "(" << I.position << " , " << I.opcode << ")" << std::endl;
-
-	return os;
-}
-
-
 void build_jump_table(std::vector<Instruction> &program) {
 	std::stack<int> call_stack;
 
@@ -172,6 +96,32 @@ void build_jump_table(std::vector<Instruction> &program) {
 			program[call_stack.top()].operand.jump_offset = i;
 			call_stack.pop();
 		}
+	}
+}
+
+
+void run(size_t memory_size, std::istream &in, std::ostream &out, const std::vector<Instruction> &program) {
+	std::vector<char> memory(memory_size);
+	std::stack<int> call_stack;
+
+	int pc   = 0;
+	int head = 0;
+
+	while (pc < program.size()) {
+		const Instruction I = program[pc];
+
+		switch (I.opcode) {
+			case Opcode::Increment  : memory[head] += 1;					break;
+			case Opcode::Decrement  : memory[head] -= 1;					break;
+			case Opcode::Left       : --head;						break;
+			case Opcode::Right      : ++head;						break;
+			case Opcode::Get        : memory[head] = in.get();				break;
+			case Opcode::Put        : out << memory[head];					break;
+			case Opcode::OpenBrace  : pc = memory[head] == 0 ? I.operand.jump_offset : pc;	break;
+			case Opcode::ClosedBrace: pc = memory[head] == 0 ? pc : I.operand.jump_offset;	break;
+		}
+
+		++pc;
 	}
 }
 
