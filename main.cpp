@@ -129,9 +129,9 @@ void run(size_t memory_size, std::istream &in, std::ostream &out, const std::vec
 void transpile_to_c(size_t memory_size, const std::vector<Instruction> &program, std::ostream &out) {
 	out
 		<< "#include <stdio.h>\n\n"
-		<< "char memory[" << memory_size << "]\n\n"
+		<< "char memory[" << memory_size << "];\n\n"
 		<< "int main() {\n"
-		<< "int head = 0\n";
+		<< "int head = 0;\n";
 
 	for (Instruction I : program) {
 		switch (I.opcode) {
@@ -165,7 +165,7 @@ int main(int argc, char *argv[]) {
 	build_jump_table(program);
 
 
-	transpile_to_c(1000, program, std::cout);
+	run(1000, std::cin, std::cout, program);
 
 
 	return 0;
