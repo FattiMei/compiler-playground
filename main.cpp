@@ -126,6 +126,32 @@ void run(size_t memory_size, std::istream &in, std::ostream &out, const std::vec
 }
 
 
+void transpile_to_c(size_t memory_size, const std::vector<Instruction> &program, std::ostream &out) {
+	out
+		<< "#include <stdio.h>\n\n"
+		<< "char memory[" << memory_size << "]\n\n"
+		<< "int main() {\n"
+		<< "int head = 0\n";
+
+	for (Instruction I : program) {
+		switch (I.opcode) {
+			case Opcode::Increment  : out << "memory[head] += 1;"		; break;
+			case Opcode::Decrement  : out << "memory[head] -= 1;"		; break;
+			case Opcode::Left       : out << "head -= 1;"			; break;
+			case Opcode::Right      : out << "head += 1;"			; break;
+			case Opcode::Get        : out << "memory[head] = getchar();"	; break;
+			case Opcode::Put        : out << "putchar(memory[head]);"	; break;
+			case Opcode::OpenBrace  : out << "while (memory[head] != 0) {"	; break;
+			case Opcode::ClosedBrace: out << "}"				; break;
+		}
+
+		out << std::endl;
+	}
+
+	out << "}\n";
+}
+
+
 int main(int argc, char *argv[]) {
 	if (argc < 3) {
 		std::cerr << "Usage        bf program.b \"input stream\"" << std::endl;
@@ -139,7 +165,7 @@ int main(int argc, char *argv[]) {
 	build_jump_table(program);
 
 
-	run(1000, std::cin, std::cout, program);
+	transpile_to_c(1000, program, std::cout);
 
 
 	return 0;
