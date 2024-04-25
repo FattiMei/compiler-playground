@@ -3,6 +3,7 @@
 #include <fstream>
 #include <vector>
 #include <stack>
+#include <cstring>
 
 
 enum class Opcode {
@@ -59,17 +60,16 @@ std::vector<Instruction> load_program_source(std::istream &in) {
 
 	while (!in.eof()) {
 		const char symbol = in.get();
-		Opcode opcode;
 
 		switch (symbol) {
-			case '+': program.push_back({i, Opcode::Increment})  ; break;
-			case '-': program.push_back({i, Opcode::Decrement})  ; break;
-			case '<': program.push_back({i, Opcode::Left})       ; break;
-			case '>': program.push_back({i, Opcode::Right})      ; break;
-			case ',': program.push_back({i, Opcode::Get})        ; break;
-			case '.': program.push_back({i, Opcode::Put})        ; break;
-			case '[': program.push_back({i, Opcode::OpenBrace})  ; break;
-			case ']': program.push_back({i, Opcode::ClosedBrace}); break;
+			case '+': program.push_back({i, Opcode::Increment,   1}); break;
+			case '-': program.push_back({i, Opcode::Decrement,   1}); break;
+			case '<': program.push_back({i, Opcode::Left,        1}); break;
+			case '>': program.push_back({i, Opcode::Right,       1}); break;
+			case ',': program.push_back({i, Opcode::Get,         1}); break;
+			case '.': program.push_back({i, Opcode::Put,         1}); break;
+			case '[': program.push_back({i, Opcode::OpenBrace,   1}); break;
+			case ']': program.push_back({i, Opcode::ClosedBrace, 1}); break;
 		}
 
 		++i;
@@ -80,9 +80,9 @@ std::vector<Instruction> load_program_source(std::istream &in) {
 
 
 void build_jump_table(std::vector<Instruction> &program) {
-	std::stack<int> call_stack;
+	std::stack<size_t> call_stack;
 
-	for (int i = 0; i < program.size(); ++i) {
+	for (size_t i = 0; i < program.size(); ++i) {
 		if (program[i].opcode == Opcode::OpenBrace) {
 			call_stack.push(i);
 		}
@@ -102,10 +102,9 @@ void build_jump_table(std::vector<Instruction> &program) {
 
 void run(size_t memory_size, std::istream &in, std::ostream &out, const std::vector<Instruction> &program) {
 	std::vector<char> memory(memory_size);
-	std::stack<int> call_stack;
 
-	int pc   = 0;
-	int head = 0;
+	size_t pc   = 0;
+	size_t head = 0;
 
 	while (pc < program.size()) {
 		const Instruction I = program[pc];
@@ -165,7 +164,12 @@ int main(int argc, char *argv[]) {
 	build_jump_table(program);
 
 
-	run(1000, std::cin, std::cout, program);
+	if (argc > 3 and strcmp(argv[3], "--transpile") == 0) {
+		transpile_to_c(1000, program, std::cout);
+	}
+	else {
+		run(1000, std::cin, std::cout, program);
+	}
 
 
 	return 0;

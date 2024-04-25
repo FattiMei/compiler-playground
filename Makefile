@@ -1,5 +1,5 @@
 CXX = g++
-WARNINGS = -Wimplicit-fallthrough
+WARNINGS = -Wimplicit-fallthrough -Wall -Wextra -Wpedantic
 
 
 target = bf
