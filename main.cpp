@@ -4,51 +4,18 @@
 #include <vector>
 #include <stack>
 #include <cstring>
-
-
-enum class Opcode {
-	Increment,
-	Decrement,
-	Left,
-	Right,
-	Get,
-	Put,
-	OpenBrace,
-	ClosedBrace
-};
-
-
-union Operand {
-	int count;
-	int jump_offset;
-};
+#include <cassert>
 
 
 struct Instruction {
 	int position;
-	Opcode opcode;
-	Operand operand;
+	char opcode;
+	int operand;
 };
 
 
-std::ostream& operator<<(std::ostream &os, Opcode op) {
-	switch (op) {
-		case Opcode::Increment  : os << "Increment"  ; break;
-		case Opcode::Decrement  : os << "Decrement"  ; break;
-		case Opcode::Left       : os << "Left"       ; break;
-		case Opcode::Right      : os << "Right"      ; break;
-		case Opcode::Get        : os << "Get"        ; break;
-		case Opcode::Put        : os << "Put"        ; break;
-		case Opcode::OpenBrace  : os << "OpenBrace"  ; break;
-		case Opcode::ClosedBrace: os << "ClosedBrace"; break;
-	}
-
-	return os;
-}
-
-
 std::ostream& operator<<(std::ostream &os, Instruction I) {
-	os << "(" << I.position << " , " << I.opcode << ")" << std::endl;
+	os << "(" << I.position << " , " << I.opcode << ", " << I.operand << ")" << std::endl;
 
 	return os;
 }
@@ -61,15 +28,8 @@ std::vector<Instruction> load_program_source(std::istream &in) {
 	while (!in.eof()) {
 		const char symbol = in.get();
 
-		switch (symbol) {
-			case '+': program.push_back({i, Opcode::Increment,   1}); break;
-			case '-': program.push_back({i, Opcode::Decrement,   1}); break;
-			case '<': program.push_back({i, Opcode::Left,        1}); break;
-			case '>': program.push_back({i, Opcode::Right,       1}); break;
-			case ',': program.push_back({i, Opcode::Get,         1}); break;
-			case '.': program.push_back({i, Opcode::Put,         1}); break;
-			case '[': program.push_back({i, Opcode::OpenBrace,   1}); break;
-			case ']': program.push_back({i, Opcode::ClosedBrace, 1}); break;
+		if (strchr("+-<>,.[]", symbol) != NULL) {
+			program.push_back({i, symbol, 1});
 		}
 
 		++i;
@@ -83,17 +43,17 @@ void build_jump_table(std::vector<Instruction> &program) {
 	std::stack<size_t> call_stack;
 
 	for (size_t i = 0; i < program.size(); ++i) {
-		if (program[i].opcode == Opcode::OpenBrace) {
+		if (program[i].opcode == '[') {
 			call_stack.push(i);
 		}
-		else if (program[i].opcode == Opcode::ClosedBrace) {
+		else if (program[i].opcode == ']') {
 			if (call_stack.empty()) {
 				std::cerr << "Unexpected closed parenthesis at " << program[i].position << std::endl;
 				break;
 			}
 
-			program[i].operand.jump_offset = call_stack.top();
-			program[call_stack.top()].operand.jump_offset = i;
+			program[i].operand = call_stack.top();
+			program[call_stack.top()].operand = i;
 			call_stack.pop();
 		}
 	}
@@ -110,14 +70,14 @@ void run(size_t memory_size, std::istream &in, std::ostream &out, const std::vec
 		const Instruction I = program[pc];
 
 		switch (I.opcode) {
-			case Opcode::Increment  : memory[head] += 1;					break;
-			case Opcode::Decrement  : memory[head] -= 1;					break;
-			case Opcode::Left       : --head;						break;
-			case Opcode::Right      : ++head;						break;
-			case Opcode::Get        : memory[head] = in.get();				break;
-			case Opcode::Put        : out << memory[head];					break;
-			case Opcode::OpenBrace  : pc = memory[head] == 0 ? I.operand.jump_offset : pc;	break;
-			case Opcode::ClosedBrace: pc = memory[head] == 0 ? pc : I.operand.jump_offset;	break;
+			case '+': memory[head] += 1;				break;
+			case '-': memory[head] -= 1;				break;
+			case '<': --head;					break;
+			case '>': ++head;					break;
+			case ',': memory[head] = in.get();			break;
+			case '.': out << memory[head];				break;
+			case '[': pc = memory[head] == 0 ? I.operand : pc;	break;
+			case ']': pc = memory[head] == 0 ? pc : I.operand;	break;
 		}
 
 		++pc;
@@ -134,14 +94,15 @@ void transpile_to_c(size_t memory_size, const std::vector<Instruction> &program,
 
 	for (Instruction I : program) {
 		switch (I.opcode) {
-			case Opcode::Increment  : out << "memory[head] += 1;"		; break;
-			case Opcode::Decrement  : out << "memory[head] -= 1;"		; break;
-			case Opcode::Left       : out << "head -= 1;"			; break;
-			case Opcode::Right      : out << "head += 1;"			; break;
-			case Opcode::Get        : out << "memory[head] = getchar();"	; break;
-			case Opcode::Put        : out << "putchar(memory[head]);"	; break;
-			case Opcode::OpenBrace  : out << "while (memory[head] != 0) {"	; break;
-			case Opcode::ClosedBrace: out << "}"				; break;
+			case '+': out << "memory[head] += 1;"		; break;
+			case '-': out << "memory[head] -= 1;"		; break;
+			case '<': out << "head -= 1;"			; break;
+			case '>': out << "head += 1;"			; break;
+			case ',': out << "memory[head] = getchar();"	; break;
+			case '.': out << "putchar(memory[head]);"	; break;
+			case '[': out << "while (memory[head] != 0) {"	; break;
+			case ']': out << "}"				; break;
+			default: assert(0);
 		}
 
 		out << std::endl;
