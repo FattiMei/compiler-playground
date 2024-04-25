@@ -29,7 +29,12 @@ std::vector<Instruction> load_program_source(std::istream &in) {
 		const char symbol = in.get();
 
 		if (strchr("+-<>,.[]", symbol) != NULL) {
-			program.push_back({i, symbol, 1});
+			if (program.size() > 0 and strchr("+-<>", symbol) != NULL and program[program.size() - 1].opcode == symbol) {
+				program[program.size() - 1].operand += 1;
+			}
+			else {
+				program.push_back({i, symbol, 1});
+			}
 		}
 
 		++i;
@@ -70,10 +75,10 @@ void run(size_t memory_size, std::istream &in, std::ostream &out, const std::vec
 		const Instruction I = program[pc];
 
 		switch (I.opcode) {
-			case '+': memory[head] += 1;				break;
-			case '-': memory[head] -= 1;				break;
-			case '<': --head;					break;
-			case '>': ++head;					break;
+			case '+': memory[head] += I.operand;			break;
+			case '-': memory[head] -= I.operand;			break;
+			case '<': head -= I.operand;				break;
+			case '>': head += I.operand;				break;
 			case ',': memory[head] = in.get();			break;
 			case '.': out << memory[head];				break;
 			case '[': pc = memory[head] == 0 ? I.operand : pc;	break;
@@ -94,14 +99,14 @@ void transpile_to_c(size_t memory_size, const std::vector<Instruction> &program,
 
 	for (Instruction I : program) {
 		switch (I.opcode) {
-			case '+': out << "memory[head] += 1;"		; break;
-			case '-': out << "memory[head] -= 1;"		; break;
-			case '<': out << "head -= 1;"			; break;
-			case '>': out << "head += 1;"			; break;
-			case ',': out << "memory[head] = getchar();"	; break;
-			case '.': out << "putchar(memory[head]);"	; break;
-			case '[': out << "while (memory[head] != 0) {"	; break;
-			case ']': out << "}"				; break;
+			case '+': out << "memory[head] += "	<< I.operand << ";"	; break;
+			case '-': out << "memory[head] -= "	<< I.operand << ";"	; break;
+			case '<': out << "head -= "		<< I.operand << ";"	; break;
+			case '>': out << "head += "		<< I.operand << ";"	; break;
+			case ',': out << "memory[head] = getchar();"			; break;
+			case '.': out << "putchar(memory[head]);"			; break;
+			case '[': out << "while (memory[head] != 0) {"			; break;
+			case ']': out << "}"						; break;
 			default: assert(0);
 		}
 
