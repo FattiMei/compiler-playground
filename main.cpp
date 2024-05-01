@@ -79,7 +79,7 @@ void run(size_t memory_size, std::istream &in, std::ostream &out, const std::vec
 			case '-': memory[head] -= I.operand;			break;
 			case '<': head -= I.operand;				break;
 			case '>': head += I.operand;				break;
-			case ',': memory[head] = in.get();			break;
+			case ',': memory[head] = in.eof() ? 0 : in.get();	break;
 			case '.': out << memory[head];				break;
 			case '[': pc = memory[head] == 0 ? I.operand : pc;	break;
 			case ']': pc = memory[head] == 0 ? pc : I.operand;	break;
