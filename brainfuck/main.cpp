@@ -8,9 +8,9 @@
 
 
 struct Instruction {
-	int position;
+	int  position;
 	char opcode;
-	int operand;
+	int  operand;
 };
 
 
@@ -117,6 +117,75 @@ void transpile_to_c(size_t memory_size, const std::vector<Instruction> &program,
 }
 
 
+void compile_to_x86_asm(size_t memory_size, const std::vector<Instruction> &program, std::ostream &out) {
+	// @DESIGN: we might investigate std::format
+	const std::string head_reg{"%rax"};
+	const std::string  val_reg{"%rbx"};
+
+	out
+		<< "\t.data\n"
+		<< "memory: .zero " << memory_size << '\n'
+		<< "\t.globl run\n"
+		<< "\t.text\n"
+		<< "run:\n"
+		<< "lea memory, " << head_reg << '\n';
+
+	for (size_t i = 0; i < program.size(); ++i) {
+		const Instruction I = program[i];
+
+		switch (I.opcode) {
+			case '+':
+				out << "mov\t(" << head_reg << ")," << val_reg << '\n';
+				out << "add\t$" << I.operand << ','  << val_reg << '\n';
+				out << "mov\t" << val_reg << ",("   << head_reg << ")\n";
+				break;
+
+			case '-':
+				out << "mov\t(" << head_reg << ")," << val_reg << '\n';
+				out << "sub\t$" << I.operand << ','  << val_reg << '\n';
+				out << "mov\t" << val_reg << ",("   << head_reg << ")\n";
+				break;
+
+			case '<':
+				out << "sub\t$" << I.operand << ',' << head_reg << '\n';
+				break;
+
+			case '>':
+				out << "add\t$" << I.operand << ',' << head_reg << '\n';
+				break;
+
+			case ',':
+				assert(0 && "Not implemented");
+				break;
+
+			case '.':
+				out << "push\t" << head_reg << '\n';
+				out << "mov\t(" << head_reg << ")," << "%rdi" << '\n';
+				out << "call\tputchar\n";
+				out << "pop \t" << head_reg << '\n';
+				break;
+
+			case '[':
+				// exploit the fact that the label pointers are exactly the indices in the program array
+				out << 'L' << i << ":\n";
+				out << "mov\t(" << head_reg << ")," << val_reg << '\n';
+
+				// branching logic, uses only the lowest bits of rbx
+				out << "cmp\t" << "$0, " << "%bl" << '\n';
+				out << "jz\t" << 'L' << I.operand << '\n';
+				break;
+
+			case ']':
+				out << "jmp\tL" << I.operand << '\n';
+				out << 'L' << i << ":\n";
+				break;
+		}
+	}
+
+	out << "ret" << std::endl;
+}
+
+
 int main(int argc, char *argv[]) {
 	if (argc < 3) {
 		std::cerr << "Usage        bf program.b \"input stream\"" << std::endl;
@@ -130,9 +199,15 @@ int main(int argc, char *argv[]) {
 	build_jump_table(program);
 
 
-	if (argc > 3 and strcmp(argv[3], "--transpile") == 0) {
-		transpile_to_c(1000, program, std::cout);
+	if (argc > 3) {
+		if (strcmp(argv[3], "--transpile") == 0) {
+			transpile_to_c(1000, program, std::cout);
+		}
+		else if (strcmp(argv[3], "--compile") == 0) {
+			compile_to_x86_asm(1000, program, std::cout);
+		}
 	}
+
 	else {
 		run(1000, std::cin, std::cout, program);
 	}
