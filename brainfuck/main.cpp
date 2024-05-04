@@ -5,6 +5,7 @@
 #include <stack>
 #include <cstring>
 #include <cassert>
+#include <format>
 
 
 struct Instruction {
@@ -124,34 +125,34 @@ void compile_to_x86_asm(size_t memory_size, const std::vector<Instruction> &prog
 
 	out
 		<< "\t.data\n"
-		<< "memory: .zero " << memory_size << '\n'
+		<< std::format("memory: .zero {0}\n", memory_size)
 		<< "\t.globl run\n"
 		<< "\t.text\n"
 		<< "run:\n"
-		<< "lea memory, " << head_reg << '\n';
+		<< std::format("lea  memory, {0}\n", head_reg);
 
 	for (size_t i = 0; i < program.size(); ++i) {
 		const Instruction I = program[i];
 
 		switch (I.opcode) {
 			case '+':
-				out << "mov\t(" << head_reg << ")," << val_reg << '\n';
-				out << "add\t$" << I.operand << ','  << val_reg << '\n';
-				out << "mov\t" << val_reg << ",("   << head_reg << ")\n";
+				out << std::format("mov  ({0}), {1}\n", head_reg, val_reg);
+				out << std::format("add  ${0}, {1}\n", I.operand, val_reg);
+				out << std::format("mov  {0}, ({1})\n", val_reg, head_reg);
 				break;
 
 			case '-':
-				out << "mov\t(" << head_reg << ")," << val_reg << '\n';
-				out << "sub\t$" << I.operand << ','  << val_reg << '\n';
-				out << "mov\t" << val_reg << ",("   << head_reg << ")\n";
+				out << std::format("mov  ({0}), {1}\n", head_reg, val_reg);
+				out << std::format("sub  ${0}, {1}\n", I.operand, val_reg);
+				out << std::format("mov  {0}, ({1})\n", val_reg, head_reg);
 				break;
 
 			case '<':
-				out << "sub\t$" << I.operand << ',' << head_reg << '\n';
+				out << std::format("sub  ${0}, {1}\n", I.operand, head_reg);
 				break;
 
 			case '>':
-				out << "add\t$" << I.operand << ',' << head_reg << '\n';
+				out << std::format("add  ${0}, {1}\n", I.operand, head_reg);
 				break;
 
 			case ',':
@@ -159,25 +160,25 @@ void compile_to_x86_asm(size_t memory_size, const std::vector<Instruction> &prog
 				break;
 
 			case '.':
-				out << "push\t" << head_reg << '\n';
-				out << "mov\t(" << head_reg << ")," << "%rdi" << '\n';
-				out << "call\tputchar\n";
-				out << "pop \t" << head_reg << '\n';
+				out << std::format("push {0}\n", head_reg);
+				out << std::format("mov  ({0}), %rdi\n", head_reg);
+				out << "call putchar\n";
+				out << std::format("pop  {0}\n", head_reg);
 				break;
 
 			case '[':
 				// exploit the fact that the label pointers are exactly the indices in the program array
-				out << 'L' << i << ":\n";
-				out << "mov\t(" << head_reg << ")," << val_reg << '\n';
+				out << std::format("L{0}:\n", i);
+				out << std::format("mov  ({0}), {1}\n", head_reg, val_reg);
 
 				// branching logic, uses only the lowest bits of rbx
-				out << "cmp\t" << "$0, " << "%bl" << '\n';
-				out << "jz\t" << 'L' << I.operand << '\n';
+				out << "cmp  $0, %bl\n";
+				out << std::format("jz   L{0}\n", I.operand);
 				break;
 
 			case ']':
-				out << "jmp\tL" << I.operand << '\n';
-				out << 'L' << i << ":\n";
+				out << std::format("jmp  L{0}\n", I.operand);
+				out << std::format("L{0}:\n", i);
 				break;
 		}
 	}

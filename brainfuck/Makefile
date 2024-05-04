@@ -1,4 +1,5 @@
-CXX = g++
+CXX      = g++-13
+STD      = -std=c++2a
 WARNINGS = -Wimplicit-fallthrough -Wall -Wextra -Wpedantic
 
 
@@ -9,7 +10,7 @@ all: $(target) hello
 
 
 $(target): main.cpp
-	$(CXX) $(WARNINGS) -O2 -o $@ main.cpp
+	$(CXX) $(STD) $(WARNINGS) -O2 -o $@ main.cpp
 
 
 hello: hello.s runtime.c
