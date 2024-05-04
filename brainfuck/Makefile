@@ -18,7 +18,7 @@ hello: hello.s runtime.c
 
 
 hello.s: $(target)
-	./$^ samples/hello.b - --compile > $@
+	./$^ samples/hello.b - --compile_to_x86 > $@
 
 
 run: $(target)
