@@ -42,3 +42,14 @@ The error messages about parenthesis should signal the position of the first err
 At this point we should have a clear idea about the interaction with the system to be. It was hard not to think about implementation details, but this description should be sufficiently general to be implemented by multiple programmers using multiple technologies.
 
 All the files in the samples directory are not mine, I will use them to test the interpreter/compiler
+
+
+# What I understood from code generation
+Compilers are foundational tools in my every day work. They handle complicated tasks like:
+ * register allocation
+ * assembling
+ * linking
+
+And also deal with the details of every architecture, for example do you know that in an ARM assembly, there can't be more than 4KB of distance from code that uses a static variable and its declaration? At least that's what I understood from google searches and gdb debugging, by the way a debugger is really useful when going at this depth in the code.
+
+I will employ "duct tape" solutions to the pool distance problem: declaring the memory array in `runtime.c` and let the compiler figure it out. It has been an intense learning experience

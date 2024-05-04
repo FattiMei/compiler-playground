@@ -66,7 +66,7 @@ void build_jump_table(std::vector<Instruction> &program) {
 }
 
 
-void run(size_t memory_size, std::istream &in, std::ostream &out, const std::vector<Instruction> &program) {
+void run(std::istream &in, std::ostream &out, const std::vector<Instruction> &program, size_t memory_size = 1000) {
 	std::vector<char> memory(memory_size);
 
 	size_t pc   = 0;
@@ -91,7 +91,7 @@ void run(size_t memory_size, std::istream &in, std::ostream &out, const std::vec
 }
 
 
-void transpile_to_c(size_t memory_size, const std::vector<Instruction> &program, std::ostream &out) {
+void transpile_to_c(std::ostream &out, const std::vector<Instruction> &program, size_t memory_size = 1000) {
 	out
 		<< "#include <stdio.h>\n\n"
 		<< "char memory[" << memory_size << "];\n\n"
@@ -118,18 +118,18 @@ void transpile_to_c(size_t memory_size, const std::vector<Instruction> &program,
 }
 
 
-void compile_to_x86_asm(size_t memory_size, const std::vector<Instruction> &program, std::ostream &out) {
-	// @DESIGN: we might investigate std::format
+// @TODO: put dot in front of labels
+void compile_to_x86_asm(std::ostream &out, const std::vector<Instruction> &program) {
+	// void run(char *memory) => the memory pointer is in the register rdi
 	const std::string head_reg{"%rax"};
 	const std::string  val_reg{"%rbx"};
 
 	out
 		<< "\t.data\n"
-		<< std::format("memory: .zero {0}\n", memory_size)
 		<< "\t.globl run\n"
 		<< "\t.text\n"
 		<< "run:\n"
-		<< std::format("lea  memory, {0}\n", head_reg);
+		<< std::format("mov  %rdi, {0}\n", head_reg);
 
 	for (size_t i = 0; i < program.size(); ++i) {
 		const Instruction I = program[i];
@@ -187,18 +187,16 @@ void compile_to_x86_asm(size_t memory_size, const std::vector<Instruction> &prog
 }
 
 
-void compile_to_arm_asm(size_t memory_size, const std::vector<Instruction> &program, std::ostream &out) {
-	// @DESIGN: we might investigate std::format
+void compile_to_arm_asm(std::ostream &out, const std::vector<Instruction> &program) {
+	// void run(char *memory) => the memory pointer is in the register r0
 	const std::string head_reg{"r0"};
 	const std::string  val_reg{"r1"};
 
 	out
-		<< "\t.data\n"
-		<< std::format("memory: .zero {0}\n", memory_size)
 		<< "\t.globl run\n"
 		<< "\t.text\n"
 		<< "run:\n"
-		<< std::format("ldr {0}, =memory", head_reg);
+		<< "push  {fp, lr}\n";
 
 	for (size_t i = 0; i < program.size(); ++i) {
 		const Instruction I = program[i];
@@ -206,13 +204,13 @@ void compile_to_arm_asm(size_t memory_size, const std::vector<Instruction> &prog
 		switch (I.opcode) {
 			case '+':
 				out << std::format("ldr  {0}, [{1}]\n", val_reg, head_reg);
-				out << std::format("add  {0}, {0}, #{1}\n", val_reg, val_reg, I.operand);
+				out << std::format("add  {0}, {0}, #{1}\n", val_reg, I.operand);
 				out << std::format("strb {0}, [{1}]\n", val_reg, head_reg);
 				break;
 
 			case '-':
 				out << std::format("ldr  {0}, [{1}]\n", val_reg, head_reg);
-				out << std::format("sub  {0}, {0}, #{1}\n", val_reg, val_reg, I.operand);
+				out << std::format("sub  {0}, {0}, #{1}\n", val_reg, I.operand);
 				out << std::format("strb {0}, [{1}]\n", val_reg, head_reg);
 				break;
 
@@ -229,19 +227,20 @@ void compile_to_arm_asm(size_t memory_size, const std::vector<Instruction> &prog
 				break;
 
 			case '.':
-				out << std::format("push {0}\n", head_reg);
+				out << std::format("push {{{0}}}\n", head_reg);
 				out << std::format("ldr  r0, [{0}]\n", head_reg);
 				out << "bl putchar\n";
-				out << std::format("pop  {0}\n", head_reg);
+				out << std::format("pop  {{{0}}}\n", head_reg);
 				break;
 
 			case '[':
 				// exploit the fact that the label pointers are exactly the indices in the program array
 				out << std::format("L{0}:\n", i);
-				out << std::format("ldr  {0}, ({1})\n", val_reg, head_reg);
+				out << std::format("ldr  {0}, [{1}]\n", val_reg, head_reg);
 
+				out << std::format("and  {0}, #255\n", val_reg);
 				out << std::format("cmp  {0}, #0\n", val_reg);
-				out << std::format("bne  L{0}\n", I.operand);
+				out << std::format("beq  L{0}\n", I.operand);
 				break;
 
 			case ']':
@@ -251,7 +250,7 @@ void compile_to_arm_asm(size_t memory_size, const std::vector<Instruction> &prog
 		}
 	}
 
-	out << "bx lr" << std::endl;
+	out << "pop  {fp, pc}" << std::endl;
 }
 
 
@@ -270,18 +269,18 @@ int main(int argc, char *argv[]) {
 
 	if (argc > 3) {
 		if (strcmp(argv[3], "--transpile") == 0) {
-			transpile_to_c(1000, program, std::cout);
+			transpile_to_c(std::cout, program);
 		}
 		else if (strcmp(argv[3], "--compile_to_x86") == 0) {
-			compile_to_x86_asm(1000, program, std::cout);
+			compile_to_x86_asm(std::cout, program);
 		}
 		else if (strcmp(argv[3], "--compile_to_arm") == 0) {
-			compile_to_arm_asm(1000, program, std::cout);
+			compile_to_arm_asm(std::cout, program);
 		}
 	}
 
 	else {
-		run(1000, std::cin, std::cout, program);
+		run(std::cin, std::cout, program);
 	}
 
 
