@@ -118,7 +118,6 @@ void transpile_to_c(std::ostream &out, const std::vector<Instruction> &program, 
 }
 
 
-// @TODO: put dot in front of labels
 void compile_to_x86_asm(std::ostream &out, const std::vector<Instruction> &program) {
 	// void run(char *memory) => the memory pointer is in the register rdi
 	const std::string head_reg{"%rax"};
@@ -168,17 +167,17 @@ void compile_to_x86_asm(std::ostream &out, const std::vector<Instruction> &progr
 
 			case '[':
 				// exploit the fact that the label pointers are exactly the indices in the program array
-				out << std::format("L{0}:\n", i);
+				out << std::format(".L{0}:\n", i);
 				out << std::format("mov  ({0}), {1}\n", head_reg, val_reg);
 
 				// branching logic, uses only the lowest bits of rbx
 				out << "cmp  $0, %bl\n";
-				out << std::format("jz   L{0}\n", I.operand);
+				out << std::format("jz   .L{0}\n", I.operand);
 				break;
 
 			case ']':
-				out << std::format("jmp  L{0}\n", I.operand);
-				out << std::format("L{0}:\n", i);
+				out << std::format("jmp  .L{0}\n", I.operand);
+				out << std::format(".L{0}:\n", i);
 				break;
 		}
 	}
@@ -235,17 +234,17 @@ void compile_to_arm_asm(std::ostream &out, const std::vector<Instruction> &progr
 
 			case '[':
 				// exploit the fact that the label pointers are exactly the indices in the program array
-				out << std::format("L{0}:\n", i);
+				out << std::format(".L{0}:\n", i);
 				out << std::format("ldr  {0}, [{1}]\n", val_reg, head_reg);
 
 				out << std::format("and  {0}, #255\n", val_reg);
 				out << std::format("cmp  {0}, #0\n", val_reg);
-				out << std::format("beq  L{0}\n", I.operand);
+				out << std::format("beq  .L{0}\n", I.operand);
 				break;
 
 			case ']':
-				out << std::format("b    L{0}\n", I.operand);
-				out << std::format("L{0}:\n", i);
+				out << std::format("b    .L{0}\n", I.operand);
+				out << std::format(".L{0}:\n", i);
 				break;
 		}
 	}
