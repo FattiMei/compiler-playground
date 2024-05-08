@@ -8,7 +8,7 @@ bf     = bf
 source = samples/hello.b
 
 
-all: $(bf) compile
+all: $(bf)
 
 
 $(bf): main.cpp
