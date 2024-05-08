@@ -1,35 +1,35 @@
-CXX      = g++-13
-STD      = -std=c++2a
-WARNINGS = -Wimplicit-fallthrough -Wall -Wextra -Wpedantic
+CXX         = g++
+OPT         = -O0
+WARNINGS    = -Wimplicit-fallthrough -Wall -Wextra -Wpedantic
+TARGET_ARCH = --compile_to_x86
 
 
-target = bf
+bf     = bf
+source = samples/hello.b
 
 
-all: $(target) hello
+all: $(bf) compile
 
 
-$(target): main.cpp
-	$(CXX) $(STD) $(WARNINGS) -O2 -o $@ main.cpp
+$(bf): main.cpp
+	$(CXX) $(WARNINGS) $(OPT) -o $@ $^
 
 
-hello: hello.s runtime.c
-	gcc -g -no-pie -o $@ $^
+run: $(bf) $(source)
+	./$^ $(source) -
 
 
-hello.s: $(target)
-	./$^ samples/hello.b - --compile_to_x86 > $@
+compile: $(bf) $(source) runtime.c
+	./$< $(source) - $(TARGET_ARCH) > out.s
+	gcc -g -o out out.s runtime.c
 
 
-run: $(target)
-	./$^ samples/hello.b -
-
-
-compile:
+transpile: $(bf) $(source)
+	./$< $(source) - --transpile > out.c
 
 
 .PHONY: clean
 
 
 clean:
-	rm $(target) hello.s
+	rm $(bf)

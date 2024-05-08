@@ -1,2 +1,5 @@
-bf
-mandelbrot
+brainfuck/bf
+brainfuck/mandelbrot
+brainfuck/out.c
+brainfuck/out.s
+brainfuck/out
