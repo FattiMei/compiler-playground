@@ -5,7 +5,9 @@
 #include <stack>
 #include <cstring>
 #include <cassert>
-#include <format>
+
+// For systems that support C++20 this is a nice library
+// #include <format>
 
 
 struct Instruction {
@@ -120,38 +122,43 @@ void transpile_to_c(std::ostream &out, const std::vector<Instruction> &program, 
 
 void compile_to_x86_asm(std::ostream &out, const std::vector<Instruction> &program) {
 	// void run(char *memory) => the memory pointer is in the register rdi
-	const std::string head_reg{"%rax"};
-	const std::string  val_reg{"%rbx"};
+	//
+	// for readability reasons the registers are harcoded in the generation instructions
+	// 	head_reg <-> %rax
+	// 	 val_reg <-> %rbx
+
+	const std::string head_reg("%rax");
+	const std::string  val_reg("%rbx");
 
 	out
 		<< "\t.data\n"
 		<< "\t.globl run\n"
 		<< "\t.text\n"
 		<< "run:\n"
-		<< std::format("mov  %rdi, {0}\n", head_reg);
+		<< "mov  %rdi, %rax\n";
 
 	for (size_t i = 0; i < program.size(); ++i) {
 		const Instruction I = program[i];
 
 		switch (I.opcode) {
 			case '+':
-				out << std::format("mov  ({0}), {1}\n", head_reg, val_reg);
-				out << std::format("add  ${0}, {1}\n", I.operand, val_reg);
-				out << std::format("mov  {0}, ({1})\n", val_reg, head_reg);
+				out << "mov  (%rax), %rbx\n";
+				out << "add  $" << I.operand << ", %rbx\n";
+				out << "mov  %rbx, (%rax)\n";
 				break;
 
 			case '-':
-				out << std::format("mov  ({0}), {1}\n", head_reg, val_reg);
-				out << std::format("sub  ${0}, {1}\n", I.operand, val_reg);
-				out << std::format("mov  {0}, ({1})\n", val_reg, head_reg);
+				out << "mov  (%rax), %rbx\n";
+				out << "sub  $" << I.operand << ", %rbx\n";
+				out << "mov  %rbx, (%rax)\n";
 				break;
 
 			case '<':
-				out << std::format("sub  ${0}, {1}\n", I.operand, head_reg);
+				out << "sub  $" << I.operand << ", %rax\n";
 				break;
 
 			case '>':
-				out << std::format("add  ${0}, {1}\n", I.operand, head_reg);
+				out << "add  $" << I.operand << ", %rax\n";
 				break;
 
 			case ',':
@@ -159,25 +166,25 @@ void compile_to_x86_asm(std::ostream &out, const std::vector<Instruction> &progr
 				break;
 
 			case '.':
-				out << std::format("push {0}\n", head_reg);
-				out << std::format("mov  ({0}), %rdi\n", head_reg);
+				out << "push %rax\n";
+				out << "mov  (%rax), %rdi\n";
 				out << "call putchar\n";
-				out << std::format("pop  {0}\n", head_reg);
+				out << "pop  %rax\n";
 				break;
 
 			case '[':
 				// exploit the fact that the label pointers are exactly the indices in the program array
-				out << std::format(".L{0}:\n", i);
-				out << std::format("mov  ({0}), {1}\n", head_reg, val_reg);
+				out << ".L" << i << ":\n";
+				out << "mov  (%rax), %rbx\n";
 
 				// branching logic, uses only the lowest bits of rbx
 				out << "cmp  $0, %bl\n";
-				out << std::format("jz   .L{0}\n", I.operand);
+				out << "jz   .L" << I.operand << '\n';
 				break;
 
 			case ']':
-				out << std::format("jmp  .L{0}\n", I.operand);
-				out << std::format(".L{0}:\n", i);
+				out << "jmp  .L" << I.operand << '\n';
+				out << ".L" << i << ":\n";
 				break;
 		}
 	}
@@ -187,9 +194,14 @@ void compile_to_x86_asm(std::ostream &out, const std::vector<Instruction> &progr
 
 
 void compile_to_arm_asm(std::ostream &out, const std::vector<Instruction> &program) {
-	// void run(char *memory) => the memory pointer is in the register r0
+	// void run(char *memory) => the memory pointer is in the register rdi
+	//
+	// for readability reasons the registers are harcoded in the generation instructions
+	// 	head_reg <-> r0
+	// 	 val_reg <-> r1
 	const std::string head_reg{"r0"};
 	const std::string  val_reg{"r1"};
+
 
 	out
 		<< "\t.globl run\n"
@@ -202,23 +214,23 @@ void compile_to_arm_asm(std::ostream &out, const std::vector<Instruction> &progr
 
 		switch (I.opcode) {
 			case '+':
-				out << std::format("ldr  {0}, [{1}]\n", val_reg, head_reg);
-				out << std::format("add  {0}, {0}, #{1}\n", val_reg, I.operand);
-				out << std::format("strb {0}, [{1}]\n", val_reg, head_reg);
+				out << "ldr  r1, r0\n";
+				out << "add  r1, #" << I.operand << '\n';
+				out << "strb r1, [r0]\n";
 				break;
 
 			case '-':
-				out << std::format("ldr  {0}, [{1}]\n", val_reg, head_reg);
-				out << std::format("sub  {0}, {0}, #{1}\n", val_reg, I.operand);
-				out << std::format("strb {0}, [{1}]\n", val_reg, head_reg);
+				out << "ldr  r1, r0\n";
+				out << "sub  r1, #" << I.operand << '\n';
+				out << "strb r1, [r0]\n";
 				break;
 
 			case '<':
-				out << std::format("sub  {0}, {0}, #{1}\n", head_reg, I.operand);
+				out << "sub  r0, #" << I.operand << '\n';
 				break;
 
 			case '>':
-				out << std::format("add  {0}, {0}, #{1}\n", head_reg, I.operand);
+				out << "add  r0, #" << I.operand << '\n';
 				break;
 
 			case ',':
@@ -226,25 +238,25 @@ void compile_to_arm_asm(std::ostream &out, const std::vector<Instruction> &progr
 				break;
 
 			case '.':
-				out << std::format("push {{{0}}}\n", head_reg);
-				out << std::format("ldr  r0, [{0}]\n", head_reg);
+				out << "push {r0}\n";
+				out << "ldr  r0, [r0]\n";
 				out << "bl putchar\n";
-				out << std::format("pop  {{{0}}}\n", head_reg);
+				out << "pop  {r0}\n";
 				break;
 
 			case '[':
 				// exploit the fact that the label pointers are exactly the indices in the program array
-				out << std::format(".L{0}:\n", i);
-				out << std::format("ldr  {0}, [{1}]\n", val_reg, head_reg);
+				out << ".L:\n" << i << ":\n";
+				out << "ldr  r1, [r0]\n";
 
-				out << std::format("and  {0}, #255\n", val_reg);
-				out << std::format("cmp  {0}, #0\n", val_reg);
-				out << std::format("beq  .L{0}\n", I.operand);
+				out << "and  r1, #255\n";
+				out << "cmp  r1, #0\n";
+				out << "beq  .L" << I.operand << '\n';
 				break;
 
 			case ']':
-				out << std::format("b    .L{0}\n", I.operand);
-				out << std::format(".L{0}:\n", i);
+				out << "b  .L" << I.operand << '\n';
+				out << ".L:\n" << i << ":\n";
 				break;
 		}
 	}
