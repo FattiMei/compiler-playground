@@ -214,13 +214,13 @@ void compile_to_arm_asm(std::ostream &out, const std::vector<Instruction> &progr
 
 		switch (I.opcode) {
 			case '+':
-				out << "ldr  r1, r0\n";
+				out << "ldr  r1, [r0]\n";
 				out << "add  r1, #" << I.operand << '\n';
 				out << "strb r1, [r0]\n";
 				break;
 
 			case '-':
-				out << "ldr  r1, r0\n";
+				out << "ldr  r1, [r0]\n";
 				out << "sub  r1, #" << I.operand << '\n';
 				out << "strb r1, [r0]\n";
 				break;
@@ -246,7 +246,7 @@ void compile_to_arm_asm(std::ostream &out, const std::vector<Instruction> &progr
 
 			case '[':
 				// exploit the fact that the label pointers are exactly the indices in the program array
-				out << ".L:\n" << i << ":\n";
+				out << ".L" << i << ":\n";
 				out << "ldr  r1, [r0]\n";
 
 				out << "and  r1, #255\n";
@@ -256,7 +256,7 @@ void compile_to_arm_asm(std::ostream &out, const std::vector<Instruction> &progr
 
 			case ']':
 				out << "b  .L" << I.operand << '\n';
-				out << ".L:\n" << i << ":\n";
+				out << ".L" << i << ":\n";
 				break;
 		}
 	}
